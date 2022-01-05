@@ -1,0 +1,8 @@
+
+hello_world : String = "hello_world";
+
+hello_world_fn : () -> String = hello_world
+
+echo s : String -> String = s
+
+main : () -> () = hello_world_fn ()
