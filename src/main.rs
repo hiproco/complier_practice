@@ -1,19 +1,114 @@
-use std::{convert::Infallible, iter::successors, ops::Not, str::FromStr};
+use human_regex::*;
+use std::{
+    convert::Infallible,
+    iter::{successors, Peekable},
+    ops::Not,
+    str::{Chars, FromStr},
+};
 use AST::*;
+//start without comments
+
+// pre stack or post stack
+
+// clone base or reference based
+
+#[test]
+fn a_white() {
+    assert_eq!('a'.is_whitespace(), false);
+    assert_eq!('\n'.is_whitespace(), true);
+}
 
 fn main() {
-    let code = "";
+    let code = "\'  char \'a # and \n \" string  \"";
 
-    let parsed = code.parse::<Tokens>().unwrap();
+    eprintln!(
+        "{:?}",
+        Tokenizer(code.chars().peekable())
+            .map(|t| {
+                if let Token::Symbol(s) = t {
+                    let trimed = s.trim().to_string();
+                    if trimed.is_empty() {
+                        Token::None
+                    } else {
+                        Token::Symbol(trimed)
+                    }
+                } else {
+                    t
+                }
+            })
+            .filter(|t| *t != Token::None)
+            .collect::<Vec<_>>()
+    );
+}
 
-    let ast = AST::parse(parsed);
+struct Tokenizer<'a>(Peekable<Chars<'a>>);
 
-    // eprintln!("{:?}", parsed);
+trait Tokenize<'a> :Iterator {
+    fn tokenize(self) -> Tokenizer<'a>;
+}
+
+impl<'a> Tokenize<'a> for Chars<'a> {
+    fn tokenize(self) -> Tokenizer<'a> {
+        Tokenizer(self.peekable())
+    }
+}
+
+impl<'a> Iterator for Tokenizer<'a> {
+    type Item = Token;
+    fn next(&mut self) -> Option<Self::Item> {
+        let chars = &mut self.0;
+        if let Some(c) = chars.next() {
+            Some(match c {
+                '#' => Token::Comment(String::from_iter(chars.by_ref().take_while(|c| *c != '\n'))),
+                '\'' => Token::Char(String::from_iter(chars.by_ref().take_while(|c| *c != '\''))),
+                '"' => Token::String(String::from_iter(chars.by_ref().take_while(|c| *c != '"'))),
+                _ => {
+                    let mut s = String::from(c);
+                    while let Some(ch) = chars.next_if(|c| !['#', '\'', '"'].contains(c)) {
+                        s.push(ch);
+                    }
+                    Token::Symbol(s)
+                }
+            })
+            // Some(Token::Symbol(s))
+        } else {
+            None
+        }
+    }
+}
+
+// trait Tokenizer : Iterator {
+//     fn get_token(&mut self) -> Token;
+// }
+
+// impl<'a> Tokenizer for Chars<'a> {
+//     fn get_token(&mut self) -> Token {
+//         if let Some(c) = self.next() {
+//             match c {
+//                 _ => (),
+//             }
+//             let mut s = String::from(c);
+//             s.extend(self.by_ref().take_while(|ch| false));
+//             Token::Symbol(s)
+//         } else {
+//             Token::EOF
+//         }
+//     }
+// }
+
+#[derive(Debug, PartialEq)]
+enum Token {
+    Comment(String),
+    Char(String),
+    String(String),
+    Number(u32),
+    Symbol(String),
+    EOF,
+    None,
 }
 
 mod AST {
-    use std::{str::FromStr, iter::successors, convert::Infallible, ops::Not};
-
+    use std::{convert::Infallible, iter::successors, ops::Not, str::FromStr};
 
     pub struct RootAST {
         node: NodeAST,
@@ -28,72 +123,72 @@ mod AST {
         Expression,
     }
 
-    pub fn parse(Tokens { stream }: Tokens) -> Result<RootAST, ParseError> {
-        let mut tokens = stream.into_iter();
-        if let Some(token) = tokens.next() {
-            match token {
-                Token::Identifier(_) => assignment(tokens),
-                Token::Number(_) => todo!(),
-                Token::StringLiteral(_) => return Err("expected function keyword, \"fn\""),
-                Token::FnKey => todo!(),
-                Token::ExternKey => todo!(),
-            }
-        }
-        expression(tokens);
-        Ok(RootAST {
-            node: NodeAST::Expression,
-        })
-    }
+    // pub fn parse(Tokens { stream }: Tokens) -> Result<RootAST, ParseError> {
+    //     let mut tokens = stream.into_iter();
+    //     if let Some(token) = tokens.next() {
+    //         match token {
+    //             Token::Identifier(_) => assignment(tokens),
+    //             Token::Number(_) => todo!(),
+    //             Token::StringLiteral(_) => return Err("expected function keyword, \"fn\""),
+    //             Token::FnKey => todo!(),
+    //             Token::ExternKey => todo!(),
+    //         }
+    //     }
+    //     expression(tokens);
+    //     Ok(RootAST {
+    //         node: NodeAST::Expression,
+    //     })
+    // }
 
-    fn assignment<I: Iterator<Item = Token>>(mut tokens: I) -> Result<NodeAST,ParseError> {
-        if let Some(Token::Identifier(name)) = tokens.next() {
-            let args = Vec::new();
-            let tokens = tokens.peekable();
-            while let Some(Token::Identifier(arg)) = tokens.peek() { 
-                args.push(arg);
-                tokens.next(); 
-            }
-            if let Some(Token::Divider) = tokens.next() {
-                if let Some(Token::Identifier(types)) = tokens.next() {
-                    if let Some(Token::FunType) = tokens.next() {
-                        if let Some(Token::Identifier(rtype)) = tokens.next() {
-                            if let Some(Token::Assign) = tokens.next() {
-                                let expression = expression(tokens)?;
-                                return Ok(NodeAST::Function{ name, args, expression })
-                            }
-                        }
-                    }
-                }
-            } else if let Some(Token::Divider) {
+    // fn assignment<I: Iterator<Item = Token>>(mut tokens: I) -> Result<NodeAST,ParseError> {
+    //     if let Some(Token::Identifier(name)) = tokens.next() {
+    //         let args = Vec::new();
+    //         let tokens = tokens.peekable();
+    //         while let Some(Token::Identifier(arg)) = tokens.peek() {
+    //             args.push(arg);
+    //             tokens.next();
+    //         }
+    //         if let Some(Token::Divider) = tokens.next() {
+    //             if let Some(Token::Identifier(types)) = tokens.next() {
+    //                 if let Some(Token::FunType) = tokens.next() {
+    //                     if let Some(Token::Identifier(rtype)) = tokens.next() {
+    //                         if let Some(Token::Assign) = tokens.next() {
+    //                             let expression = expression(tokens)?;
+    //                             return Ok(NodeAST::Function{ name, args, expression })
+    //                         }
+    //                     }
+    //                 }
+    //             }
+    //         } else if let Some(Token::Divider) {
 
-            }
-        }
-    }
+    //         }
+    //     }
+    // }
 
-    fn expression<I: Iterator<Item = Token>>(mut tokens: I) -> Result<NodeAST, ParseError> {
-        if let Some(t) = tokens.next() {
-            if let Token::Identifier(_) = t {}
-        }
-        Ok(NodeAST::Expression)
-    }
+    // fn expression<I: Iterator<Item = Token>>(mut tokens: I) -> Result<NodeAST, ParseError> {
+    //     if let Some(t) = tokens.next() {
+    //         if let Token::Identifier(_) = t {}
+    //     }
+    //     Ok(NodeAST::Expression)
+    // }
 
-    type ParseError = &'static str;
+    // type ParseError = &'static str;
 
-    fn function<I: Iterator<Item = Token>>(mut tokens: I) -> Result<NodeAST, ParseError> {
-        if let Some(Token::FnKey) = tokens.next() {
-            if let Some(Token::Identifier(function_name)) = tokens.next() {
-                let expression = Box::new(expression(tokens));
-                Ok(NodeAST::Function {
-                    function_name,
-                    expression,
-                })
-            } else {
-                Err("expected Identifier")
-            }
-        } else {
-            Err("Expected function keyword, \"fn\"")
-        }
-    }
+    // fn function<I: Iterator<Item = Token>>(mut tokens: I) -> Result<NodeAST, ParseError> {
+    //     if let Some(Token::FnKey) = tokens.next() {
+    //         if let Some(Token::Identifier(function_name)) = tokens.next() {
+    //             let expression = Box::new(expression(tokens));
+    //             Ok(NodeAST::Function {
+    //                 function_name,
+    //                 expression,
+    //             })
+    //         } else {
+    //             Err("expected Identifier")
+    //         }
+    //     } else {
+    //         Err("Expected function keyword, \"fn\"")
+    //     }
+    // }
 
     #[derive(Debug)]
     pub struct Tokens {
@@ -163,7 +258,7 @@ mod AST {
         ExternKey,
         Divider,
         FunType,
-        Assign
+        Assign,
     }
 
     impl FromStr for Token {

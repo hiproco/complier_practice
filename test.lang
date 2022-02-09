@@ -6,3 +6,6 @@ hello_world_fn : () -> String = hello_world
 echo s : String -> String = s
 
 main : () -> () = hello_world_fn ()
+
+
+// stackbased
